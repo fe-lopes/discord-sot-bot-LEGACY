@@ -41,16 +41,50 @@ app.post('/interactions', async function (req, res) {
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name } = data;
 
-    // "test" command
     if (name === 'test') {
-      // Send a message into the channel where command was triggered from
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          // Fetches a random emoji to send from a helper function
-          content: 'hello world ' + getRandomEmoji(),
+          content: 'hello sea of thieves ' + getRandomEmoji(),
         },
       });
+    }
+
+    if (name === 'sea') {
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          content: 'of thieves 🌊',
+        },
+      });
+    }
+  }
+
+  /**
+   * Handle message commands that start with "!"
+   */
+  if (type === InteractionType.MESSAGE_COMPONENT && data.custom_id.startsWith('!')) {
+    const command = data.custom_id.slice(1); // remove the "!" at the start
+    const acceptedCommands = ['timoneiro', 'canhoneiro', 'chefe', 'navegador'];
+    // Add your command handlers here
+
+    if (acceptedCommands.includes(command)) {
+      // Obtém o cargo correspondente ao comando
+      const role = message.guild.roles.cache.find(role => role.name === command);
+  
+      // Verifica se o usuário já tem o cargo
+      if (message.member.roles.cache.has(role.id)) {
+        // Se o usuário já tem o cargo, remove-o
+        await message.member.roles.remove(role);
+        message.reply(`${message.member.displayName} não é mais um ${command}!`);
+      } else {
+        // Se o usuário não tem o cargo, adiciona-o
+        await message.member.roles.add(role);
+        message.reply(`${message.member.displayName} agora é um ${command}!`);
+      }
+    } else {
+      // Se o comando não é um dos aceitos, envia uma mensagem de "cargo inválido"
+      message.reply(`"${command}" não é um cargo válido.`);
     }
   }
 });
