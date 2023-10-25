@@ -1,0 +1,28 @@
+{
+    "channels": {
+        "welcome": "1166554177015648346",
+        "autoRole": "1166518052448378943"
+    },
+    "welcomeMessages": [
+        "se juntou a frota",
+        "foi resgatade do mar",
+        "jurou fidelidade à Armada Vermelha",
+        "encontrou sua nova tripulação",
+        "chegou para fazer coisas de pirata",
+        "veio cometer crimes",
+        "se jogou de canhão e caiu no servidor",
+        "chegou fugindo de Devil's Roar",
+        "chegou se refugiando da tempestade",
+        "não olhou pra frente e bateu no servidor",
+        "isçou sua bandeira vermelha",
+        "acha que o Senhor dos Piratas mereceu as facadas",
+        "se ajoelhou perante o lorde guardião",
+        "foi lançado ao servidor pelo kraken"
+    ],
+    "acceptedRoles": [
+        "timoneiro",
+        "canhoneiro",
+        "chefe",
+        "navegador"
+    ]
+}

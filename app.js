@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import fs from 'fs';
 import express from 'express';
 import {
   InteractionType,
@@ -8,83 +9,181 @@ import {
   ButtonStyleTypes,
 } from 'discord-interactions';
 import { VerifyDiscordRequest, getRandomEmoji, DiscordRequest } from './utils.js';
-import { getShuffledOptions, getResult } from './game.js';
+import { Client, GatewayIntentBits, AttachmentBuilder } from 'discord.js'
 
-// Create an express app
+import { createCanvas, loadImage, registerFont } from 'canvas';
+registerFont('heyjack.ttf', { family: 'HeyJack' });
+
+const d20Background = await loadImage('./assets/d20.png');
+const configFile = 'config.json';
+const configData = await fs.promises.readFile(configFile, 'utf8');
+const config = JSON.parse(configData);
+const channels = config.channels;
+const welcomeMessages = config.welcomeMessages;
+const acceptedRoles = config.acceptedRoles;
+
 const app = express();
-// Get port, or default to 3000
 const PORT = process.env.PORT || 3000;
-// Parse request body and verifies incoming requests using discord-interactions package
 app.use(express.json({ verify: VerifyDiscordRequest(process.env.PUBLIC_KEY) }));
 
-// Store for in-progress games. In production, you'd want to use a DB
-const activeGames = {};
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildScheduledEvents,
+    GatewayIntentBits.MessageContent,
+  ],
+});
 
-/**
- * Interactions endpoint URL where Discord will send HTTP requests
- */
+client.login(process.env.BOT_TOKEN);
+
+client.on('guildMemberAdd', (member) => {
+  const channel = member.guild.channels.cache.get(channels.welcome);
+  if (channel) {
+    const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+    channel.send(`<@${member.user.id}> ${randomMessage}! ${getRandomEmoji()}`);
+  }
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  const member = message.guild.members.cache.get(message.author.id);
+
+  if (message.channel.id == channels.autoRole) {
+    message.delete().catch(console.error);
+    if (message.content.startsWith('!')) {
+      const command = message.content.slice(1);
+      const role = acceptedRoles.find(acceptedRole => acceptedRole.toLowerCase() === command.toLowerCase());
+      const roleObject = role ? message.guild.roles.cache.find(r => r.name.toLowerCase() === role.toLowerCase()) : undefined;
+
+      if (roleObject) {
+        if (member.roles.cache.has(roleObject.id)) {
+          member.roles.remove(roleObject).then(() => {
+            message.channel.send(`<@${message.author.id}> deixou de ser ${command}`)
+              .then((responseMessage) => {
+                setTimeout(() => {
+                  responseMessage.delete().catch(console.error);
+                }, 8000);
+              })
+              .catch(console.error);
+          });
+        } else {
+          member.roles.add(roleObject).then(() => {
+            message.channel.send(`<@${message.author.id}> agora é ${command}`)
+              .then((responseMessage) => {
+                setTimeout(() => {
+                  responseMessage.delete().catch(console.error);
+                }, 8000);
+              })
+              .catch(console.error);
+          });
+        }
+      } else {
+        message.channel.send(`<@${message.author.id}> 🚫➡️ o cargo mencionado não existe.\n**Insira um cargo válido!**`)
+          .then((responseMessage) => {
+            setTimeout(() => {
+              responseMessage.delete().catch(console.error);
+            }, 10000);
+          })
+          .catch(console.error);
+      }
+    } else {
+      message.channel.send(`<@${message.author.id}> 🚫➡️ sua mensagem não corresponde ao formato permitido neste canal.\n**Utilize os comandos corretos!**`)
+        .then((responseMessage) => {
+          setTimeout(() => {
+            responseMessage.delete().catch(console.error);
+          }, 10000);
+        })
+        .catch(console.error);
+    }
+  } else {
+    if (message.content.startsWith(`!d20`)) {
+      const result = Math.floor(Math.random() * 20) + 1;
+  
+      const canvas = createCanvas(200, 200);
+      const context = canvas.getContext('2d');
+      context.drawImage(d20Background, 0, 0, 200, 200);
+      context.save();
+      context.translate(100, 100);
+      context.rotate(-35 * (Math.PI / 180));
+      context.font = '38px heyjack';
+      context.textAlign = 'center';
+      context.fillStyle = 'black';
+      context.fillText(result.toString(), 10, 26);
+      context.restore();
+      const buffer = canvas.toBuffer('image/png');
+
+      async function sendImage(channel, text, buffer) {
+        let attachment = new AttachmentBuilder(buffer, 'd20_result.png');
+        await message.reply(text);
+        await channel.send({ files: [attachment] });
+      }
+      
+      sendImage(message.channel, `Seu resultado é ${result}`, buffer);
+    }
+  }
+});
+
 app.post('/interactions', async function (req, res) {
-  // Interaction type and data
   const { type, id, data } = req.body;
 
-  /**
-   * Handle verification requests
-   */
   if (type === InteractionType.PING) {
     return res.send({ type: InteractionResponseType.PONG });
   }
 
-  /**
-   * Handle slash command requests
-   * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
-   */
   if (type === InteractionType.APPLICATION_COMMAND) {
     const { name } = data;
-
-    if (name === 'test') {
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: 'hello sea of thieves ' + getRandomEmoji(),
-        },
-      });
-    }
-
-    if (name === 'sea') {
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: 'of thieves 🌊',
-        },
-      });
-    }
   }
 
-  /**
-   * Handle message commands that start with "!"
-   */
-  if (type === InteractionType.MESSAGE_COMPONENT && data.custom_id.startsWith('!')) {
-    const command = data.custom_id.slice(1); // remove the "!" at the start
-    const acceptedCommands = ['timoneiro', 'canhoneiro', 'chefe', 'navegador'];
-    // Add your command handlers here
+  if (type === InteractionType.MESSAGE_COMPONENT) {
+    // custom_id set in payload when sending message component
+    const componentId = data.custom_id;
+    const selectedOption = data.values[0];
 
-    if (acceptedCommands.includes(command)) {
-      // Obtém o cargo correspondente ao comando
-      const role = message.guild.roles.cache.find(role => role.name === command);
-  
-      // Verifica se o usuário já tem o cargo
-      if (message.member.roles.cache.has(role.id)) {
-        // Se o usuário já tem o cargo, remove-o
-        await message.member.roles.remove(role);
-        message.reply(`${message.member.displayName} não é mais um ${command}!`);
+    if (componentId === 'role_select') {
+      const selectedOption = data.values[0];
+      const userId = req.body.member.user.id;
+      const guildId = req.body.channel.guild_id;
+      const guild = client.guilds.cache.get(guildId);
+
+      if (acceptedRoles.includes(selectedOption)) {
+        guild.members.fetch(userId)
+          .then(member => {
+            const role = guild.roles.cache.find((r) => r.name === selectedOption);
+            if (role) {
+              if (member.roles.cache.has(role.id)) {
+                console.log('possui')
+                member.roles.remove(role).then(() => {
+                  return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: `<@${userId}> deixou de ser ${selectedOption}`, ephemeral: true },
+                  });
+                }).catch((error) => {
+                  console.error(error);
+                  return res.status(500).send("Erro ao remover cargo.");
+                });
+              } else {
+                console.log('não possui')
+                member.roles.add(role).then(() => {
+                  return res.send({
+                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                    data: { content: `<@${userId}> agora é ${selectedOption}`, ephemeral: true },
+                  });
+                }).catch((error) => {
+                  console.error(error);
+                  return res.status(500).send("Erro ao adicionar cargo.");
+                });
+              }
+            }
+          })
+          .catch(error => {
+            console.log(`Erro ao buscar o membro: ${error}`);
+          });
       } else {
-        // Se o usuário não tem o cargo, adiciona-o
-        await message.member.roles.add(role);
-        message.reply(`${message.member.displayName} agora é um ${command}!`);
+        console.log("Cargo não aceito.");
       }
-    } else {
-      // Se o comando não é um dos aceitos, envia uma mensagem de "cargo inválido"
-      message.reply(`"${command}" não é um cargo válido.`);
     }
   }
 });
