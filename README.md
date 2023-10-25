@@ -10,11 +10,12 @@ Este projeto contém o código-fonte do bot Papagaio Pirata (sot-parrot), constr
 
 Comandos do `bot`
 
-- `!role` para adicionar e remover cargos que estão incluídos na lista de cargos.
+- `!<role_name>` para adicionar e remover cargos que estão incluídos na lista de cargos.
+- `!d20` para rolar um d20 e exibir o resultado em texto e imagem.
 
-Webhooks
+Mensagens automáticas
 
-- `Patch Notes` post automático de novos patch notes diretamente do site do Sea of Thieves, em português.
+- Postagem automática de mensagens de boas-vindas sempre que um novo membro entrar no servidor, escolhendo uma frase aleatória entre várias registradas no arquivo `config.json`
 
 ## Links úteis para o desenvolvimento
 
