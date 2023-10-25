@@ -40,7 +40,7 @@ const client = new Client({
 client.login(process.env.BOT_TOKEN);
 
 client.on('guildMemberAdd', (member) => {
-  const channel = member.guild.channels.cache.get(channels.welcome);
+  const channel = member.guild.channels.cache.find((channel) => welcomeChannelIDs.includes(channel.id));
   if (channel) {
     const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
     channel.send(`<@${member.user.id}> ${randomMessage}! ${getRandomEmoji()}`);
@@ -51,7 +51,7 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   const member = message.guild.members.cache.get(message.author.id);
 
-  if (message.channel.id == channels.autoRole) {
+  if (channels.autoRole.includes(message.channel.id)) {
     message.delete().catch(console.error);
     if (message.content.startsWith('!')) {
       const command = message.content.slice(1);
@@ -138,53 +138,7 @@ app.post('/interactions', async function (req, res) {
   }
 
   if (type === InteractionType.MESSAGE_COMPONENT) {
-    // custom_id set in payload when sending message component
     const componentId = data.custom_id;
-    const selectedOption = data.values[0];
-
-    if (componentId === 'role_select') {
-      const selectedOption = data.values[0];
-      const userId = req.body.member.user.id;
-      const guildId = req.body.channel.guild_id;
-      const guild = client.guilds.cache.get(guildId);
-
-      if (acceptedRoles.includes(selectedOption)) {
-        guild.members.fetch(userId)
-          .then(member => {
-            const role = guild.roles.cache.find((r) => r.name === selectedOption);
-            if (role) {
-              if (member.roles.cache.has(role.id)) {
-                console.log('possui')
-                member.roles.remove(role).then(() => {
-                  return res.send({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: `<@${userId}> deixou de ser ${selectedOption}`, ephemeral: true },
-                  });
-                }).catch((error) => {
-                  console.error(error);
-                  return res.status(500).send("Erro ao remover cargo.");
-                });
-              } else {
-                console.log('não possui')
-                member.roles.add(role).then(() => {
-                  return res.send({
-                    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                    data: { content: `<@${userId}> agora é ${selectedOption}`, ephemeral: true },
-                  });
-                }).catch((error) => {
-                  console.error(error);
-                  return res.status(500).send("Erro ao adicionar cargo.");
-                });
-              }
-            }
-          })
-          .catch(error => {
-            console.log(`Erro ao buscar o membro: ${error}`);
-          });
-      } else {
-        console.log("Cargo não aceito.");
-      }
-    }
   }
 });
 
