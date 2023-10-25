@@ -40,7 +40,7 @@ const client = new Client({
 client.login(process.env.BOT_TOKEN);
 
 client.on('guildMemberAdd', (member) => {
-  const channel = member.guild.channels.cache.find((channel) => welcomeChannelIDs.includes(channel.id));
+  const channel = member.guild.channels.cache.find((channel) => channels.welcome.includes(channel.id));
   if (channel) {
     const randomMessage = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
     channel.send(`<@${member.user.id}> ${randomMessage}! ${getRandomEmoji()}`);
